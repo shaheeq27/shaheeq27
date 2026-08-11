@@ -13,6 +13,6 @@
 
 <h3><code>shaheeq@github ~ $ ./contributions.sh</code></h3>
 
-<img src="./contrib-heatmap-arcade.gif?v=2" width="860" alt="Shaheeq's arcade activity heatmap" />
+<img src="./contrib-heatmap-arcade.gif?v=3" width="860" alt="Shaheeq's arcade activity heatmap" />
 
 </div>
