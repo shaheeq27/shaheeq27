@@ -1,110 +1,139 @@
 #!/usr/bin/env python3
-"""Render a dense terminal-style contribution/activity heatmap.
+"""Render the contribution heatmap as a tiny arcade game.
 
-The README artwork is intentionally more visually saturated than the
-live GitHub contribution graph shown lower on the profile. Real
-contribution data is used to seed the palette, while empty days get
-deterministic decorative tiles so the banner has the dense visual
-treatment of the reference design.
+The grid stays visually GitHub-like, while a small fighter flies below it,
+fires upward, briefly knocks out cells, and lets them regenerate.
 """
 
 import hashlib
-import json
 import calendar
-from datetime import datetime, timedelta
+from datetime import date, timedelta
 from pathlib import Path
 
 PALETTE = ["#161b22", "#0e4429", "#006d32", "#26a641", "#39d353", "#69f0a0"]
-BOX_SIZE, BOX_GAP = 11, 3
-MARGIN_LEFT, MARGIN_TOP, MARGIN_RIGHT = 30, 20, 20
+BOX, GAP = 11, 3
+LEFT, TOP, RIGHT = 30, 20, 20
 WEEKS = 53
 FONT = "'SF Mono','Fira Code','Consolas',monospace"
+PLANE_Y = 150
 
 
-def decorative_level(day, count):
-    if count > 0:
-        return min(5, max(1, int(count)))
-    h = int(hashlib.sha256(f"shaheeq27:{day}".encode()).hexdigest()[:8], 16)
-    r = h % 100
-    if r < 6:
+def level(seed: str) -> int:
+    value = int(hashlib.sha256(seed.encode()).hexdigest()[:8], 16) % 100
+    if value < 14:
         return 0
-    if r < 28:
+    if value < 34:
         return 1
-    if r < 52:
+    if value < 58:
         return 2
-    if r < 76:
+    if value < 80:
         return 3
-    if r < 93:
+    if value < 94:
         return 4
     return 5
 
 
 def main():
-    data = json.loads(Path("data/contributions.json").read_text())
-    by_date = {d["date"]: d["count"] for d in data["days"]}
+    width = LEFT + WEEKS * (BOX + GAP) - GAP + RIGHT
+    grid_height = 7 * (BOX + GAP) - GAP
+    height = 184
 
-    start = datetime.strptime(data["days"][0]["date"], "%Y-%m-%d").date()
+    start = date(2025, 8, 10)
     start -= timedelta(days=(start.weekday() + 1) % 7)
 
-    grid_width = WEEKS * (BOX_SIZE + BOX_GAP) - BOX_GAP
-    grid_height = 7 * (BOX_SIZE + BOX_GAP) - BOX_GAP
-    legend_y = MARGIN_TOP + grid_height + 20
-    footer_y = legend_y + 26
-    width = MARGIN_LEFT + grid_width + MARGIN_RIGHT
-    height = footer_y + 12
+    months, seen = [], set()
+    for week in range(WEEKS):
+        d = start + timedelta(days=week * 7)
+        key = (d.year, d.month)
+        if key not in seen:
+            seen.add(key)
+            months.append((week, calendar.month_abbr[d.month]))
 
     out = [
         f'<svg viewBox="0 0 {width} {height}" width="{width}" height="{height}" '
         'xmlns="http://www.w3.org/2000/svg">',
         '<rect width="100%" height="100%" fill="#0d1117"/>',
+        '<defs>',
+        '<pattern id="cells" width="98" height="98" patternUnits="userSpaceOnUse">',
     ]
 
-    seen = set()
-    for w in range(WEEKS):
-        week_date = start + timedelta(days=w * 7)
-        key = (week_date.year, week_date.month)
-        if key not in seen:
-            seen.add(key)
-            x = MARGIN_LEFT + w * (BOX_SIZE + BOX_GAP)
+    for row in range(7):
+        for col in range(7):
+            shade = [2, 3, 3, 4, 2, 4, 1][
+                int(hashlib.sha256(f"base:{col}:{row}".encode()).hexdigest()[:8], 16) % 7
+            ]
             out.append(
-                f'<text x="{x}" y="{MARGIN_TOP - 6}" font-family="{FONT}" '
-                f'font-size="10" fill="#8b949e">{calendar.month_abbr[week_date.month]}</text>'
+                f'<rect x="{col * 14}" y="{row * 14}" width="11" height="11" '
+                f'rx="2" fill="{PALETTE[shade]}"/>'
             )
 
-        for d in range(7):
-            day = start + timedelta(days=w * 7 + d)
-            day_key = day.isoformat()
-            level = decorative_level(day_key, by_date.get(day_key, 0))
-            x = MARGIN_LEFT + w * (BOX_SIZE + BOX_GAP)
-            y = MARGIN_TOP + d * (BOX_SIZE + BOX_GAP)
-            out.append(
-                f'<rect x="{x}" y="{y}" width="{BOX_SIZE}" height="{BOX_SIZE}" '
-                f'rx="2" fill="{PALETTE[level]}"><title>Activity tile • {day_key}</title></rect>'
-            )
+    out += [
+        '</pattern>',
+        '<style>.hit{transform-box:fill-box;transform-origin:center}.ship{filter:drop-shadow(0 0 2px #39d353)}.shot{fill:#69f0a0}</style>',
+        '</defs>',
+    ]
 
-    out.append(
-        f'<text x="{MARGIN_LEFT}" y="{legend_y}" font-family="{FONT}" '
-        'font-size="10" fill="#8b949e">Less</text>'
-    )
-    for i, color in enumerate(PALETTE):
-        x = MARGIN_LEFT + 34 + i * (BOX_SIZE + BOX_GAP)
+    for week, month in months:
+        x = LEFT + week * 14
         out.append(
-            f'<rect x="{x}" y="{legend_y - 9}" width="{BOX_SIZE}" height="{BOX_SIZE}" '
-            f'rx="2" fill="{color}"/>'
+            f'<text x="{x}" y="14" font-family="{FONT}" font-size="10" fill="#8b949e">{month}</text>'
         )
-    more_x = MARGIN_LEFT + 34 + len(PALETTE) * (BOX_SIZE + BOX_GAP) + 4
-    out.append(
-        f'<text x="{more_x}" y="{legend_y}" font-family="{FONT}" '
-        'font-size="10" fill="#8b949e">More</text>'
-    )
-    out.append(
-        f'<text x="{MARGIN_LEFT}" y="{footer_y}" font-family="{FONT}" '
-        'font-size="11" fill="#8b949e">activity matrix • live GitHub stats below</text>'
-    )
-    out.append("</svg>")
 
+    grid_width = WEEKS * (BOX + GAP) - GAP
+    out.append(
+        f'<rect x="{LEFT}" y="{TOP}" width="{grid_width}" height="{grid_height}" fill="url(#cells)"/>'
+    )
+
+    gaps = set()
+    for week in range(WEEKS):
+        for row in range(7):
+            h = int(hashlib.sha256(f"gap:{week}:{row}".encode()).hexdigest()[:8], 16)
+            if h % 100 < 18:
+                gaps.add((week, row))
+
+    targets = [(6, 3), (11, 5), (16, 2), (22, 4), (28, 1), (34, 5), (40, 1), (46, 4), (51, 2)]
+
+    for week, row in gaps:
+        if (week, row) in targets:
+            continue
+        x, y = LEFT + week * 14, TOP + row * 14
+        out.append(f'<rect x="{x}" y="{y}" width="11" height="11" rx="2" fill="#161b22"/>')
+
+    for week, row in targets:
+        x, y = LEFT + week * 14, TOP + row * 14
+        begin = ((x + 5 - 30) / (748 - 30)) * 6
+        out += [
+            f'<rect x="{x}" y="{y}" width="11" height="11" rx="2" fill="#39d353" class="hit">',
+            f'<animate attributeName="opacity" values="1;0.04;1" keyTimes="0;0.5;1" begin="{begin:.2f}s" dur="1.1s" repeatCount="indefinite"/>',
+            '</rect>',
+        ]
+
+    out += [
+        '<g class="ship">',
+        '<path d="M0 8 L10 0 L20 8 L16 8 L13 13 L7 13 L4 8 Z" fill="#c9d1d9"/>',
+        '<path d="M7 8 L10 2 L13 8 Z" fill="#39d353"/>',
+        '<rect x="8" y="11" width="4" height="4" rx="1" fill="#69f0a0"/>',
+        '<path d="M2 10 L0 14 L5 12 Z M18 10 L20 14 L15 12 Z" fill="#39d353"/>',
+        f'<animateTransform attributeName="transform" type="translate" values="30 {PLANE_Y};748 {PLANE_Y};30 {PLANE_Y}" keyTimes="0;0.5;1" dur="12s" repeatCount="indefinite"/>',
+        '</g>',
+    ]
+
+    for week, row in targets:
+        x, y = LEFT + week * 14, TOP + row * 14
+        tx, ty = x + 5, y + 5
+        begin = ((tx - 30) / (748 - 30)) * 6
+        out += [
+            '<g class="shot">',
+            f'<rect x="{tx - 1.5}" y="{PLANE_Y - 10}" width="3" height="7" rx="1.5">',
+            f'<animate attributeName="y" values="{PLANE_Y - 10};{ty}" begin="{begin:.2f}s" dur="0.55s" repeatCount="indefinite"/>',
+            f'<animate attributeName="opacity" values="0;1;1;0" keyTimes="0;.05;.9;1" begin="{begin:.2f}s" dur="0.65s" repeatCount="indefinite"/>',
+            '</rect>',
+            '</g>',
+        ]
+
+    out.append('</svg>')
     Path("contrib-heatmap.svg").write_text("\n".join(out) + "\n", encoding="utf-8")
-    print("[render_heatmap_svg] wrote dense contrib-heatmap.svg")
+    print("[render_heatmap_svg] wrote arcade contrib-heatmap.svg")
 
 
 if __name__ == "__main__":
