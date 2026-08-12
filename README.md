@@ -5,7 +5,7 @@
 <table>
   <tr>
     <td valign="top"><img src="./info-card.svg?v=2" width="490" alt="Shaheeq profile info" /></td>
-    <td valign="top"><img src="./avi-ascii.svg?v=2" width="370" alt="Shaheeq ASCII portrait" /></td>
+    <td valign="top"><img src="./avi-ascii.svg?v=2" width="500" alt="Shaheeq ASCII portrait" /></td>
   </tr>
 </table>
 
