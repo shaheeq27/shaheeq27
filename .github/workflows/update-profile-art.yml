@@ -2,10 +2,10 @@ name: Update profile art
 
 "on":
   schedule:
-    - cron: "17 6 * * *"   # ~06:17 UTC daily
+    - cron: "17 6 * * *"
   workflow_dispatch: {}
   push:
-    branches: [main]
+    branches: [master]
 
 permissions:
   contents: write
@@ -14,20 +14,17 @@ jobs:
   heatmap:
     runs-on: ubuntu-latest
     env:
-      # IMPORTANT: replace with your actual GitHub username before
-      # relying on this workflow — fetch_contributions.py falls back
-      # to a placeholder value and will scrape the wrong profile
-      # (or fail) if this isn't set correctly.
-      GITHUB_USERNAME: YOUR_GITHUB_USERNAME
+      GITHUB_USERNAME: shaheeq27
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - run: pip install requests==2.32.3 beautifulsoup4==4.12.3
+      - run: pip install requests==2.32.3 beautifulsoup4==4.12.3 Pillow==10.4.0
       - run: python scripts/fetch_contributions.py
       - run: python scripts/render_heatmap_svg.py
+      - run: python scripts/generate_arcade_heatmap.py --out contrib-heatmap-arcade.gif
       - uses: stefanzweifel/git-auto-commit-action@v5
         with:
-          commit_message: "chore: refresh contribution graph [skip ci]"
-          file_pattern: "data/contributions.json contrib-heatmap.svg"
+          commit_message: "chore: refresh contribution arcade [skip ci]"
+          file_pattern: "data/contributions.json contrib-heatmap.svg contrib-heatmap-arcade.gif"
